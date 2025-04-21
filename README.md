@@ -1,1 +1,1 @@
-# Winnjoy Admin Dashboard
+# winnjoy-admin: Next.js starter project
