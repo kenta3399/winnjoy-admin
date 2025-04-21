@@ -20,7 +20,7 @@ const auth = getAuth();
 const provider = new GoogleAuthProvider();
 
 const allowedUsers = [
-  'kenta3399@gmail.com'
+  'jodigame4@gmail.com'
 ];
 
 export default function Home() {
