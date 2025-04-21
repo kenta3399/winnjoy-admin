@@ -1,22 +1,19 @@
-import { useEffect, useState } from 'react';
-import { initializeApp } from 'firebase/app';
-import {
-  getAuth,
-  signInWithPopup,
-  GoogleAuthProvider,
-  onAuthStateChanged,
-  signOut
-} from 'firebase/auth';
+import { useEffect, useState } from "react";
+import { initializeApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSy8BYFOEq8BHaZallzx1x6DVzjBN1IJjFYnM",
+  apiKey: "AIzaSyBBYFOEq8BHaZalIxz1x6DVzjBNt1JjFYnM",
   authDomain: "winnjoy-admin.firebaseapp.com",
   projectId: "winnjoy-admin",
-  appId: "1:999732827140:web:83693c5f373bb790d2d151"
+  storageBucket: "winnjoy-admin.appspot.com",
+  messagingSenderId: "999732827140",
+  appId: "1:999732827140:web:83693c5f373bb790d2d151",
+  measurementId: "G-1836QJLX1"
 };
 
-initializeApp(firebaseConfig);
-const auth = getAuth();
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
 const allowedUsers = [
@@ -25,45 +22,48 @@ const allowedUsers = [
 
 export default function Home() {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [accessDenied, setAccessDenied] = useState(false);
 
-  useEffect(() => {
-    onAuthStateChanged(auth, (user) => {
-      setLoading(false);
-      if (user && allowedUsers.includes(user.email)) {
-        setUser(user);
-        setAccessDenied(false);
-      } else if (user) {
-        setAccessDenied(true);
-        setUser(null);
+  const allowEmails = [
+    "kenta@winnjoy.com",
+    "admin@soza.com",
+    "jodigame4@gmail.com"
+  ];
+
+  const login = async () => {
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const userData = result.user;
+
+      if (!allowEmails.includes(userData.email)) {
+        alert("⛔ คุณไม่มีสิทธิ์เข้าใช้งานระบบนี้");
+        await signOut(auth);
+        return;
       }
-    });
-  }, []);
 
-  const handleLogin = () => {
-    signInWithPopup(auth, provider);
+      setUser(userData);
+    } catch (err) {
+      console.error(err);
+      alert("เกิดข้อผิดพลาดในการเข้าสู่ระบบ");
+    }
   };
 
-  const handleLogout = () => {
-    signOut(auth);
+  const logout = async () => {
+    await signOut(auth);
+    setUser(null);
   };
-
-  if (loading) return <p style={{ padding: 40 }}>กำลังโหลด...</p>;
-  if (accessDenied) return <p style={{ padding: 40, color: 'red' }}>⛔ ไม่ได้รับสิทธิ์เข้าใช้งาน</p>;
 
   return (
-    <div style={{ padding: 40, fontFamily: 'sans-serif' }}>
-      {!user ? (
+    <div style={{ padding: "2rem", fontFamily: "sans-serif" }}>
+      {user ? (
         <>
-          <h1>🔐 เข้าสู่ระบบแอดมิน</h1>
-          <button onClick={handleLogin}>ล็อกอินด้วย Google</button>
+          <h1>🎉 ยินดีต้อนรับ {user.displayName}</h1>
+          <p>เข้าสู่ระบบด้วย: {user.email}</p>
+          <button onClick={logout}>ออกจากระบบ</button>
         </>
       ) : (
         <>
-          <h1>🎉 ยินดีต้อนรับ, {user.displayName}</h1>
-          <p>{user.email}</p>
-          <button onClick={handleLogout}>ออกจากระบบ</button>
+          <h1>🔐 เข้าสู่ระบบแอดมิน</h1>
+          <button onClick={login}>ล็อกอินด้วย Google</button>
         </>
       )}
     </div>
