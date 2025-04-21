@@ -26,7 +26,8 @@ export default function Home() {
   const allowEmails = [
     "kenta@winnjoy.com",
     "admin@soza.com",
-    "jodigame4@gmail.com"
+    "jodigame4@gmail.com",
+    "kenta@winnjoy.com"
   ];
 
   const login = async () => {
