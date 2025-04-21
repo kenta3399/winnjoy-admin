@@ -1,1 +1,1 @@
-# winnjoy-admin: Next.js starter project
+# winnjoy-admin - Next.js v12 project using pages/ router
