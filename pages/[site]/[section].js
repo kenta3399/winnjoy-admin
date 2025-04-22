@@ -1,95 +1,122 @@
 // ✅ pages/[site]/[section].js
-import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { db } from "../../firebaseClient";
-import {
-  doc, getDoc, setDoc
-} from "firebase/firestore";
-import ContentGrid from "../../components/ContentGrid";
+import { useEffect, useState } from "react";
+import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { initializeApp } from "firebase/app";
+import ContentBox from "../../components/ContentBox";
+import MenuDropdown from "../../components/MenuDropdown";
+import "../../styles.css";
 
-export default function SectionPage({ user }) {
+const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+export default function SectionPage() {
   const router = useRouter();
   const { site, section } = router.query;
   const [items, setItems] = useState([]);
-  const [editingIndex, setEditingIndex] = useState(null);
-  const [editingData, setEditingData] = useState({ text: "", image: "" });
+  const [user, setUser] = useState(null);
   const [canEdit, setCanEdit] = useState(false);
-
-  const contentKey = `${site}_${section}`;
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!site || !section || !user) return;
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      if (u) {
+        const snap = await getDoc(doc(db, "users", u.uid));
+        const data = snap.data();
+        setUser(data);
+        setCanEdit(data?.canEdit || data?.username === "kenta");
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (!site || !section) return;
+    const loadData = async () => {
+      const docRef = doc(db, "contents", `${site}_${section}`);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        setItems(snap.data().items || []);
+      }
+      setLoading(false);
+    };
     loadData();
-    setCanEdit(user?.canEditContent === true || user?.username === "kenta");
-  }, [site, section, user]);
+  }, [site, section]);
 
-  const loadData = async () => {
-    const ref = doc(db, "contents", contentKey);
-    const snap = await getDoc(ref);
-    if (snap.exists()) setItems(snap.data().items || []);
-  };
-
-  const saveData = async (newItems) => {
-    await setDoc(doc(db, "contents", contentKey), { items: newItems });
+  const updateFirestore = async (newItems) => {
+    await updateDoc(doc(db, "contents", `${site}_${section}`), {
+      items: newItems,
+    });
     setItems(newItems);
-    setEditingIndex(null);
-    setEditingData({ text: "", image: "" });
   };
 
-  const handleEdit = (idx) => {
-    setEditingIndex(idx);
-    setEditingData(items[idx]);
+  const logAction = async (action) => {
+    if (!user) return;
+    const logRef = doc(db, "logs", `${Date.now()}_${user.username}`);
+    await updateDoc(logRef, {
+      site,
+      section,
+      user: user.username,
+      action,
+      timestamp: new Date().toISOString(),
+    });
   };
 
-  const handleDelete = (idx) => {
-    const newItems = [...items];
-    newItems.splice(idx, 1);
-    saveData(newItems);
+  const handleEdit = (index, field, value) => {
+    const updated = [...items];
+    updated[index][field] = value;
+    updateFirestore(updated);
+    logAction(`edit item ${index}`);
   };
 
-  const handleSaveEdit = () => {
-    const newItems = [...items];
-    newItems[editingIndex] = editingData;
-    saveData(newItems);
+  const handleDelete = (index) => {
+    const updated = items.filter((_, i) => i !== index);
+    updateFirestore(updated);
+    logAction(`delete item ${index}`);
   };
 
-  const handleAddNew = () => {
-    const newItems = [...items, { text: "", image: "" }];
-    setEditingIndex(newItems.length - 1);
-    setEditingData({ text: "", image: "" });
+  const handleAdd = () => {
+    const updated = [...items, { text: "", image: "" }];
+    updateFirestore(updated);
+    logAction("add item");
   };
+
+  if (loading) return <div className="loading">Loading...</div>;
 
   return (
-    <div>
-      <h2>📁 {site} / {section}</h2>
+    <div className="section-container">
+      <div className="section-header">
+        <h2>{site?.toUpperCase()} / {section}</h2>
+        {canEdit && <MenuDropdown site={site} current={section} />}
+      </div>
+
+      <div className="content-grid">
+        {items.map((item, index) => (
+          <ContentBox
+            key={index}
+            index={index}
+            item={item}
+            canEdit={canEdit}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
+        ))}
+      </div>
+
       {canEdit && (
-        <button onClick={handleAddNew}>➕ เพิ่มกล่องใหม่</button>
-      )}
-
-      <ContentGrid
-        items={items}
-        canEdit={canEdit}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-      />
-
-      {editingIndex !== null && (
-        <div style={{ marginTop: 20, border: "1px solid #aaa", padding: 15 }}>
-          <h4>✏️ แก้ไขกล่องที่ {editingIndex + 1}</h4>
-          <input
-            type="text"
-            placeholder="ลิงก์รูปภาพ"
-            value={editingData.image}
-            onChange={(e) => setEditingData({ ...editingData, image: e.target.value })}
-            style={{ display: "block", marginBottom: 10, width: "100%" }}
-          />
-          <textarea
-            placeholder="ข้อความ"
-            value={editingData.text}
-            onChange={(e) => setEditingData({ ...editingData, text: e.target.value })}
-            style={{ display: "block", width: "100%", height: 100 }}
-          />
-          <button onClick={handleSaveEdit} style={{ marginTop: 10 }}>💾 บันทึก</button>
+        <div className="add-button-wrap">
+          <button className="add-button" onClick={handleAdd}>➕ เพิ่มกล่องใหม่</button>
         </div>
       )}
     </div>

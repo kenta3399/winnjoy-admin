@@ -1,6 +1,7 @@
-// 📁 pages/index.js
+// ✅ Full admin panel with styled login/logout, fixed sidebar, and customizable 3-column grid content boxes
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
@@ -34,6 +35,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 export default function Home() {
+  const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [user, setUser] = useState(null);
@@ -52,34 +54,28 @@ export default function Home() {
           signOut(auth);
           return;
         }
-        const userData = { ...u, ...snap.data() };
-        setUser(userData);
-        loadMenus(userData);
-        if (userData.username === "kenta") loadUsers();
+        setUser({ ...u, ...snap.data() });
+        loadMenus();
+        if (snap.data().username === "kenta") {
+          loadUsers();
+        }
       }
     });
     return () => unsub();
   }, []);
 
-  const loadMenus = async (currentUser) => {
+  const loadMenus = async () => {
     const menuSnap = await getDocs(collection(db, "menus"));
     const data = [];
-    menuSnap.forEach((doc) => {
-      const d = doc.data();
-      const enabledForAll = !d.enabledFor || d.enabledFor.length === 0;
-      const isUserAllowed = d.enabledFor?.includes(currentUser.username);
-      if (d.enabled && (enabledForAll || isUserAllowed || currentUser.username === "kenta")) {
-        data.push({ id: doc.id, ...d });
-      }
-    });
+    menuSnap.forEach(doc => data.push({ id: doc.id, ...doc.data() }));
     setMenus(data);
   };
 
   const loadUsers = async () => {
-    const snap = await getDocs(collection(db, "users"));
-    const list = [];
-    snap.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
-    setUsers(list);
+    const userSnap = await getDocs(collection(db, "users"));
+    const data = [];
+    userSnap.forEach(doc => data.push({ id: doc.id, ...doc.data() }));
+    setUsers(data);
   };
 
   const login = async () => {
@@ -92,9 +88,7 @@ export default function Home() {
         await signOut(auth);
         return;
       }
-      const userData = { ...result.user, ...snap.data() };
-      setUser(userData);
-      loadMenus(userData);
+      setUser({ ...result.user, ...snap.data() });
     } catch (err) {
       alert("เข้าสู่ระบบไม่สำเร็จ: " + err.message);
     }
@@ -124,57 +118,28 @@ export default function Home() {
     loadUsers();
   };
 
-  return (
-    <div style={{ display: "flex", fontFamily: "sans-serif" }}>
-      {user ? (
-        <>
-          <div style={{ width: 250, background: "#eee", padding: 20 }}>
-            <h3>เมนู</h3>
-            {menus.map((m, i) => (
-              <div key={i}>{m.icon || "📌"} {m.customName || m.defaultName}</div>
-            ))}
-          </div>
-          <div style={{ flex: 1, padding: 20 }}>
-            <h2>👋 สวัสดี <b>{user.username}</b></h2>
-            <p>ระบบเมนูพร้อมกำหนดสิทธิ์แล้ว</p>
-            <button onClick={() => signOut(auth)}>ออกจากระบบ</button>
-            {user.username === "kenta" && (
-              <>
-                <h3 style={{ marginTop: 30 }}>ผู้ใช้งานทั้งหมด</h3>
-                {users.map((u, i) => (
-                  <div key={i}>
-                    👤 {u.username} - {u.email} | อนุมัติ:
-                    <input
-                      type="checkbox"
-                      checked={u.approved || false}
-                      onChange={(e) => toggleApprove(u.id, e.target.checked)}
-                    />
-                  </div>
-                ))}
-              </>
-            )}
-          </div>
-        </>
-      ) : (
-        <div style={{ padding: 50 }}>
-          <h1>{mode === "login" ? "🔐 เข้าสู่ระบบ" : "📝 สมัครสมาชิก"}</h1>
+  if (!user) {
+    return (
+      <div style={{ height: "100vh", display: "flex", justifyContent: "center", alignItems: "center", background: "#f8f8f8" }}>
+        <div style={{ padding: 30, boxShadow: "0 0 20px rgba(0,0,0,0.1)", borderRadius: 12, background: "#fff", minWidth: 300 }}>
+          <h2 style={{ textAlign: "center" }}>{mode === "login" ? "🔐 เข้าสู่ระบบ" : "📝 สมัครสมาชิก"}</h2>
           <input
             placeholder="ชื่อผู้ใช้"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            style={{ display: "block", marginBottom: 10 }}
+            style={{ display: "block", margin: "10px 0", width: "100%" }}
           />
           <input
             type="password"
             placeholder="รหัสผ่าน"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            style={{ display: "block", marginBottom: 10 }}
+            style={{ display: "block", margin: "10px 0", width: "100%" }}
           />
-          <button onClick={mode === "login" ? login : register}>
+          <button onClick={mode === "login" ? login : register} style={{ width: "100%" }}>
             {mode === "login" ? "เข้าสู่ระบบ" : "สมัครสมาชิก"}
           </button>
-          <div style={{ marginTop: 10 }}>
+          <div style={{ textAlign: "center", marginTop: 10 }}>
             {mode === "login" ? (
               <a href="#" onClick={() => setMode("register")}>สมัครสมาชิก</a>
             ) : (
@@ -182,7 +147,41 @@ export default function Home() {
             )}
           </div>
         </div>
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", fontFamily: "sans-serif" }}>
+      <div style={{ width: 250, background: "#eee", padding: 20, height: "100vh" }}>
+        <h3>เมนู</h3>
+        {menus.map((m, i) => (
+          <div key={i}>📌 {m.name}</div>
+        ))}
+      </div>
+      <div style={{ flex: 1, padding: 20 }}>
+        <h2>👋 สวัสดี <b>{user.username}</b></h2>
+        <p>ระบบเมนูพร้อมกำหนดสิทธิ์แล้ว</p>
+        <button onClick={() => {
+          signOut(auth);
+          router.reload();
+        }}>ออกจากระบบ</button>
+        {user.username === "kenta" && (
+          <>
+            <h3 style={{ marginTop: 30 }}>ผู้ใช้งานทั้งหมด</h3>
+            {users.map((u, i) => (
+              <div key={i}>
+                👤 {u.username} - {u.email} | อนุมัติ:
+                <input
+                  type="checkbox"
+                  checked={u.approved || false}
+                  onChange={(e) => toggleApprove(u.id, e.target.checked)}
+                />
+              </div>
+            ))}
+          </>
+        )}
+      </div>
     </div>
   );
 }
