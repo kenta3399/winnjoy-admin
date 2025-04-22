@@ -40,6 +40,7 @@ const Sidebar = ({ user, onLogout }) => {
               marginBottom: 6,
               cursor: "pointer",
               transition: "0.2s",
+              color: "#fff"
             }}>
               👥 พนักงาน
             </div>
@@ -70,7 +71,7 @@ const Sidebar = ({ user, onLogout }) => {
         ))}
       </div>
 
-      {/* ชื่อยูสเซอร์ + ปุ่ม logout */}
+      {/* 👤 ชื่อยูสเซอร์ + ปุ่ม logout */}
       <div style={{
         marginTop: "auto",
         paddingTop: 16,

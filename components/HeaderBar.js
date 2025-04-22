@@ -1,45 +1,37 @@
-// ✅ HeaderBar.js - แสดงชื่อพนักงาน + ปุ่มออกจากระบบแบบ 3D สีแดง
-import { signOut } from "firebase/auth";
-import { auth } from "../firebaseClient";
-import { useRouter } from "next/router";
+// ✅ HeaderBar.js — แถบบนพร้อมชื่อยูสและปุ่ม Logout 3D
+import React from "react";
 
-export default function HeaderBar({ user }) {
-  const router = useRouter();
-
-  const handleLogout = async () => {
-    await signOut(auth);
-    router.push("/"); // กลับไปหน้าล็อกอิน
-  };
-
+const HeaderBar = ({ user, onLogout }) => {
   return (
     <div style={{
       display: "flex",
       justifyContent: "flex-end",
       alignItems: "center",
-      padding: "10px 30px",
-      background: "#fff",
-      boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
-      gap: "12px"
+      padding: "10px 20px",
+      background: "#f0f0f0",
+      borderBottom: "1px solid #ddd",
+      position: "sticky",
+      top: 0,
+      zIndex: 1000,
     }}>
-      <div style={{ fontWeight: "bold" }}>👤 {user?.username}</div>
+      <span style={{ marginRight: 20, fontWeight: "bold" }}>👤 {user?.username}</span>
       <button
-        onClick={handleLogout}
+        onClick={onLogout}
         style={{
-          background: "linear-gradient(to bottom, #ff5f5f, #d60000)",
-          color: "white",
-          padding: "10px 18px",
-          borderRadius: "12px",
-          boxShadow: "0 4px 10px rgba(255, 0, 0, 0.3)",
+          background: "linear-gradient(to bottom, #ff5555, #cc0000)",
           border: "none",
+          color: "white",
+          padding: "6px 12px",
+          borderRadius: 12,
           cursor: "pointer",
           fontWeight: "bold",
-          transition: "transform 0.2s ease"
+          boxShadow: "0 2px 5px rgba(0,0,0,0.3)",
         }}
-        onMouseOver={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
-        onMouseOut={(e) => (e.currentTarget.style.transform = "scale(1)")}
       >
-        ออกจากระบบ
+        🚪 ออกจากระบบ
       </button>
     </div>
   );
-}
+};
+
+export default HeaderBar;
