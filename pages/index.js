@@ -84,7 +84,7 @@ export default function Home() {
           <h1>{mode === "login" ? "🔐 เข้าสู่ระบบ" : "📝 สมัครสมาชิก"}</h1>
           <input
             type="text"
-            placeholder="ชื่อผู้ใช้ (เช่น kenta)"
+            placeholder="ชื่อผู้ใช้ (เช่น Admin1)"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             style={{ display: "block", marginBottom: "1rem", padding: "0.5rem" }}
