@@ -1,21 +1,22 @@
+// pages/index.js
 import { useEffect, useState } from "react";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signOut
+  signOut,
 } from "firebase/auth";
 import {
   getFirestore,
-  collection,
-  getDocs,
   doc,
   setDoc,
-  updateDoc
+  getDoc,
+  collection,
+  getDocs,
+  updateDoc,
 } from "firebase/firestore";
 
-// 🔐 config จาก .env
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -36,25 +37,41 @@ export default function Home() {
   const [user, setUser] = useState(null);
   const [mode, setMode] = useState("login");
   const [menus, setMenus] = useState([]);
-  const [editingMenuId, setEditingMenuId] = useState(null);
-  const [editingMenuName, setEditingMenuName] = useState("");
+  const [menuEdits, setMenuEdits] = useState({});
 
   const fakeEmail = `${username}@local.fake`;
 
   const login = async () => {
     try {
       const result = await signInWithEmailAndPassword(auth, fakeEmail, password);
-      setUser(result.user);
+      const userData = result.user;
+      const ref = doc(db, "users", userData.uid);
+      const snap = await getDoc(ref);
+
+      if (!snap.exists() || snap.data().approved !== true) {
+        alert("❌ บัญชียังไม่ได้รับการอนุมัติจากผู้ดูแลระบบ");
+        await signOut(auth);
+        return;
+      }
+
+      setUser({ ...userData, ...snap.data() });
     } catch (err) {
-      alert("เข้าสู่ระบบไม่ได้: " + err.message);
+      alert("เข้าสู่ระบบไม่สำเร็จ: " + err.message);
     }
   };
 
   const register = async () => {
     try {
       const result = await createUserWithEmailAndPassword(auth, fakeEmail, password);
+      const userData = result.user;
+      await setDoc(doc(db, "users", userData.uid), {
+        username,
+        email: userData.email,
+        approved: false,
+        role: "user",
+      });
+      alert("✅ สมัครสำเร็จ! กรุณารอแอดมินอนุมัติ");
       await signOut(auth);
-      alert("✅ สมัครสำเร็จแล้ว กรุณาเข้าสู่ระบบ");
       setUsername("");
       setPassword("");
     } catch (err) {
@@ -62,122 +79,85 @@ export default function Home() {
     }
   };
 
-  const loadMenus = async () => {
-    const snapshot = await getDocs(collection(db, "menus"));
-    if (snapshot.empty) {
-      // ไม่มีเมนู สร้างตัวอย่าง
-      await setDoc(doc(db, "menus", "menu_1"), {
-        id: "menu_1",
-        defaultName: "หน้าหลัก",
-        customName: "หน้าหลัก",
-        icon: "🏠",
-        path: "/dashboard",
-        enabledFor: ["kenta"]
-      });
-      return loadMenus();
+  const fetchMenus = async () => {
+    const querySnapshot = await getDocs(collection(db, "menus"));
+    const loadedMenus = [];
+    querySnapshot.forEach((doc) => {
+      loadedMenus.push({ id: doc.id, ...doc.data() });
+    });
+    setMenus(loadedMenus);
+  };
+
+  const updateMenus = async () => {
+    for (const menuId in menuEdits) {
+      const newLabel = menuEdits[menuId];
+      await updateDoc(doc(db, "menus", menuId), { label: newLabel });
     }
-    const all = [];
-    snapshot.forEach((doc) => all.push(doc.data()));
-    setMenus(all);
+    alert("✅ บันทึกเมนูสำเร็จแล้ว");
+    setMenuEdits({});
+    fetchMenus();
   };
 
   useEffect(() => {
     if (user) {
-      loadMenus();
+      fetchMenus();
     }
   }, [user]);
 
-  const saveCustomName = async (id) => {
-    const menuRef = doc(db, "menus", id);
-    await updateDoc(menuRef, { customName: editingMenuName });
-    setEditingMenuId(null);
-    loadMenus();
-  };
+  if (!user) {
+    return (
+      <div style={{ padding: 40 }}>
+        <h2>{mode === "login" ? "🔐 เข้าสู่ระบบ" : "📝 สมัครสมาชิก"}</h2>
+        <input
+          placeholder="ชื่อผู้ใช้"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+        />
+        <input
+          placeholder="รหัสผ่าน"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <button onClick={mode === "login" ? login : register}>
+          {mode === "login" ? "เข้าสู่ระบบ" : "สมัครสมาชิก"}
+        </button>
+        <p>
+          {mode === "login" ? (
+            <a href="#" onClick={() => setMode("register")}>สมัครสมาชิก</a>
+          ) : (
+            <a href="#" onClick={() => setMode("login")}>เข้าสู่ระบบ</a>
+          )}
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ display: "flex", fontFamily: "sans-serif" }}>
-      {/* เมนูด้านซ้าย */}
-      {user && (
-        <div style={{ width: "240px", background: "#eee", padding: "1rem" }}>
-          <h3>เมนู</h3>
-          <ul style={{ listStyle: "none", padding: 0 }}>
-            {menus
-              .filter((m) => m.enabledFor.includes(user.email.split("@")[0]))
-              .map((m) => (
-                <li key={m.id} style={{ marginBottom: "1rem" }}>
-                  <span style={{ fontSize: "1.2rem" }}>{m.icon}</span>{" "}
-                  {editingMenuId === m.id ? (
-                    <>
-                      <input
-                        value={editingMenuName}
-                        onChange={(e) => setEditingMenuName(e.target.value)}
-                      />
-                      <button onClick={() => saveCustomName(m.id)}>💾</button>
-                    </>
-                  ) : (
-                    <>
-                      <strong>{m.customName}</strong>
-                      {user.email.startsWith("kenta@") && (
-                        <button
-                          onClick={() => {
-                            setEditingMenuId(m.id);
-                            setEditingMenuName(m.customName);
-                          }}
-                          style={{ marginLeft: "0.5rem" }}
-                        >
-                          ✏️
-                        </button>
-                      )}
-                    </>
-                  )}
-                </li>
-              ))}
-          </ul>
-        </div>
-      )}
-
-      {/* กลางจอ */}
-      <div style={{ flex: 1, padding: "2rem" }}>
-        {!user ? (
-          <>
-            <h2>{mode === "login" ? "🔐 เข้าสู่ระบบ" : "📝 สมัครสมาชิก"}</h2>
+    <div style={{ display: "flex", height: "100vh" }}>
+      <div style={{ width: 300, background: "#eee", padding: 20 }}>
+        <h3>เมนู</h3>
+        {menus.map((menu) => (
+          <div key={menu.id}>
+            <span>🏠 </span>
             <input
-              placeholder="ชื่อผู้ใช้"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              style={{ display: "block", marginBottom: "1rem", padding: "0.5rem" }}
+              value={menuEdits[menu.id] ?? menu.label}
+              onChange={(e) =>
+                setMenuEdits((prev) => ({ ...prev, [menu.id]: e.target.value }))
+              }
             />
-            <input
-              type="password"
-              placeholder="รหัสผ่าน"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{ display: "block", marginBottom: "1rem", padding: "0.5rem" }}
-            />
-            <button onClick={mode === "login" ? login : register}>
-              {mode === "login" ? "เข้าสู่ระบบ" : "สมัครสมาชิก"}
-            </button>
-            <p style={{ marginTop: "1rem" }}>
-              {mode === "login" ? (
-                <>
-                  ยังไม่มีบัญชี? <a onClick={() => setMode("register")}>สมัครสมาชิก</a>
-                </>
-              ) : (
-                <>
-                  มีบัญชีแล้ว? <a onClick={() => setMode("login")}>เข้าสู่ระบบ</a>
-                </>
-              )}
-            </p>
-          </>
-        ) : (
-          <>
-            <h2>👋 สวัสดี {user.email.split("@")[0]}</h2>
-            <p>ระบบเมนูพร้อมกำหนดสิทธิ์แล้ว</p>
-            <button onClick={() => signOut(auth).then(() => setUser(null))}>
-              ออกจากระบบ
-            </button>
-          </>
-        )}
+          </div>
+        ))}
+        <button onClick={updateMenus}>💾 บันทึกเมนู</button>
+      </div>
+      <div style={{ padding: 40 }}>
+        <h2>
+          👋 สวัสดี <b>{user.username}</b>
+        </h2>
+        <p>ระบบเมนูพร้อมกำหนดสิทธิ์แล้ว</p>
+        <button onClick={() => signOut(auth).then(() => setUser(null))}>
+          ออกจากระบบ
+        </button>
       </div>
     </div>
   );
