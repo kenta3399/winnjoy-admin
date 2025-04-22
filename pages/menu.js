@@ -1,11 +1,8 @@
 // pages/menu.js
 import { useEffect, useState } from "react";
-import { getFirestore, collection, getDocs, updateDoc, doc } from "firebase/firestore";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { app } from "../firebaseClient";
-
-const db = getFirestore(app);
-const auth = getAuth(app);
+import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
+import { db, auth } from "../firebaseClient";
 
 export default function MenuManager() {
   const [menus, setMenus] = useState([]);
