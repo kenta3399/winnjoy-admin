@@ -1,6 +1,6 @@
-// ✅ แก้ไขจากโค้ดก่อนหน้า โดยเพิ่มระบบเปิด/ปิดสิทธิ์แต่ละเมนูได้
+// ✅ Full admin panel with fixed menu for all users, except user 'kenta' who has permissions to manage others.
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
@@ -14,9 +14,9 @@ import {
   doc,
   setDoc,
   getDoc,
+  updateDoc,
   collection,
   getDocs,
-  updateDoc,
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -34,29 +34,47 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 export default function Home() {
-  const [user, setUser] = useState(null);
-  const [menus, setMenus] = useState([]);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [mode, setMode] = useState("login"); // login/register
-
+  const [user, setUser] = useState(null);
+  const [mode, setMode] = useState("login");
+  const [menus, setMenus] = useState([]);
+  const [users, setUsers] = useState([]);
   const fakeEmail = `${username}@local.fake`;
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const ref = doc(db, "users", user.uid);
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      if (u) {
+        const ref = doc(db, "users", u.uid);
         const snap = await getDoc(ref);
-        if (!snap.exists() || snap.data().approved !== true) return;
-        const data = snap.data();
-        const menusSnap = await getDocs(collection(db, "menus"));
-        const menuData = menusSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        setUser({ ...data, uid: user.uid });
-        setMenus(menuData);
+        if (!snap.exists() || snap.data().approved !== true) {
+          alert("❌ บัญชียังไม่ได้รับการอนุมัติ");
+          signOut(auth);
+          return;
+        }
+        setUser({ ...u, ...snap.data() });
+        loadMenus();
+        if (snap.data().username === "kenta") {
+          loadUsers();
+        }
       }
     });
-    return () => unsubscribe();
+    return () => unsub();
   }, []);
+
+  const loadMenus = async () => {
+    const menuSnap = await getDocs(collection(db, "menus"));
+    const data = [];
+    menuSnap.forEach(doc => data.push({ id: doc.id, ...doc.data() }));
+    setMenus(data);
+  };
+
+  const loadUsers = async () => {
+    const userSnap = await getDocs(collection(db, "users"));
+    const data = [];
+    userSnap.forEach(doc => data.push({ id: doc.id, ...doc.data() }));
+    setUsers(data);
+  };
 
   const login = async () => {
     try {
@@ -64,92 +82,98 @@ export default function Home() {
       const ref = doc(db, "users", result.user.uid);
       const snap = await getDoc(ref);
       if (!snap.exists() || snap.data().approved !== true) {
-        alert("ยังไม่ได้รับอนุมัติ");
+        alert("❌ บัญชียังไม่ได้รับการอนุมัติจากแอดมิน");
         await signOut(auth);
         return;
       }
-      const data = snap.data();
-      const menusSnap = await getDocs(collection(db, "menus"));
-      const menuData = menusSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setUser({ ...data, uid: result.user.uid });
-      setMenus(menuData);
+      setUser({ ...result.user, ...snap.data() });
     } catch (err) {
-      alert("เข้าสู่ระบบล้มเหลว: " + err.message);
+      alert("เข้าสู่ระบบไม่สำเร็จ: " + err.message);
     }
   };
 
   const register = async () => {
     try {
       const result = await createUserWithEmailAndPassword(auth, fakeEmail, password);
-      await setDoc(doc(db, "users", result.user.uid), {
+      const userData = result.user;
+      await setDoc(doc(db, "users", userData.uid), {
         username,
-        email: result.user.email,
+        email: userData.email,
         approved: false,
-        role: "user",
+        isAdmin: false
       });
-      alert("สมัครแล้ว รออนุมัติ");
+      alert("✅ สมัครสำเร็จ! กรุณารอแอดมินอนุมัติ");
       await signOut(auth);
       setUsername("");
       setPassword("");
     } catch (err) {
-      alert("สมัครล้มเหลว: " + err.message);
+      alert("สมัครไม่สำเร็จ: " + err.message);
     }
   };
 
-  const toggleMenu = async (id, value) => {
-    const ref = doc(db, "menus", id);
-    await updateDoc(ref, { enabled: value });
-    setMenus(menus.map((m) => (m.id === id ? { ...m, enabled: value } : m)));
+  const toggleApprove = async (uid, value) => {
+    await updateDoc(doc(db, "users", uid), { approved: value });
+    loadUsers();
   };
 
   return (
-    <div style={{ display: "flex", padding: 20, gap: 40 }}>
-      {!user ? (
-        <div>
-          <h3>{mode === "login" ? "🔐 เข้าสู่ระบบ" : "📝 สมัครสมาชิก"}</h3>
-          <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="username" />
-          <input value={password} type="password" onChange={(e) => setPassword(e.target.value)} placeholder="password" />
-          <button onClick={mode === "login" ? login : register}>
-            {mode === "login" ? "เข้าสู่ระบบ" : "สมัครสมาชิก"}
-          </button>
-        </div>
-      ) : (
+    <div style={{ display: "flex", fontFamily: "sans-serif" }}>
+      {user ? (
         <>
-          <div>
+          <div style={{ width: 250, background: "#eee", padding: 20 }}>
             <h3>เมนู</h3>
-            <ul>
-              {menus.filter((m) => m.enabled).map((m) => (
-                <li key={m.id}>🏠 {m.label}</li>
-              ))}
-            </ul>
+            {menus.map((m, i) => (
+              <div key={i}>📌 {m.name}</div>
+            ))}
           </div>
-          <div>
+          <div style={{ flex: 1, padding: 20 }}>
             <h2>👋 สวัสดี <b>{user.username}</b></h2>
             <p>ระบบเมนูพร้อมกำหนดสิทธิ์แล้ว</p>
+            <button onClick={() => signOut(auth)}>ออกจากระบบ</button>
             {user.username === "kenta" && (
               <>
-                <h4>กำหนดสิทธิ์เมนู</h4>
-                {menus.map((menu) => (
-                  <div key={menu.id}>
-                    <input
-                      value={menu.label}
-                      onChange={async (e) => {
-                        await updateDoc(doc(db, "menus", menu.id), { label: e.target.value });
-                        setMenus(menus.map((m) => (m.id === menu.id ? { ...m, label: e.target.value } : m)));
-                      }}
-                    />
+                <h3 style={{ marginTop: 30 }}>ผู้ใช้งานทั้งหมด</h3>
+                {users.map((u, i) => (
+                  <div key={i}>
+                    👤 {u.username} - {u.email} | อนุมัติ:
                     <input
                       type="checkbox"
-                      checked={menu.enabled}
-                      onChange={(e) => toggleMenu(menu.id, e.target.checked)}
+                      checked={u.approved || false}
+                      onChange={(e) => toggleApprove(u.id, e.target.checked)}
                     />
                   </div>
                 ))}
               </>
             )}
-            <button onClick={() => signOut(auth)}>ออกจากระบบ</button>
           </div>
         </>
+      ) : (
+        <div style={{ padding: 50 }}>
+          <h1>{mode === "login" ? "🔐 เข้าสู่ระบบ" : "📝 สมัครสมาชิก"}</h1>
+          <input
+            placeholder="ชื่อผู้ใช้"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            style={{ display: "block", marginBottom: 10 }}
+          />
+          <input
+            type="password"
+            placeholder="รหัสผ่าน"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={{ display: "block", marginBottom: 10 }}
+          />
+          <button onClick={mode === "login" ? login : register}>
+            {mode === "login" ? "เข้าสู่ระบบ" : "สมัครสมาชิก"}
+          </button>
+          <div style={{ marginTop: 10 }}>
+            {mode === "login" ? (
+              <a href="#" onClick={() => setMode("register")}>สมัครสมาชิก</a>
+            ) : (
+              <a href="#" onClick={() => setMode("login")}>เข้าสู่ระบบ</a>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
