@@ -1,22 +1,21 @@
-// pages/index.js
 import { useEffect, useState } from "react";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signOut,
+  signOut
 } from "firebase/auth";
 import {
   getFirestore,
-  doc,
-  setDoc,
-  getDoc,
   collection,
   getDocs,
-  updateDoc,
+  doc,
+  setDoc,
+  updateDoc
 } from "firebase/firestore";
 
+// 🔐 config จาก .env
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -35,58 +34,27 @@ export default function Home() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [user, setUser] = useState(null);
-  const [userData, setUserData] = useState(null);
   const [mode, setMode] = useState("login");
-  const [allUsers, setAllUsers] = useState([]);
+  const [menus, setMenus] = useState([]);
+  const [editingMenuId, setEditingMenuId] = useState(null);
+  const [editingMenuName, setEditingMenuName] = useState("");
 
   const fakeEmail = `${username}@local.fake`;
-
-  useEffect(() => {
-    if (user?.uid && userData?.role === "admin") {
-      loadAllUsers();
-    }
-  }, [user, userData]);
-
-  const loadAllUsers = async () => {
-    const querySnapshot = await getDocs(collection(db, "users"));
-    const users = [];
-    querySnapshot.forEach((doc) => {
-      users.push({ id: doc.id, ...doc.data() });
-    });
-    setAllUsers(users);
-  };
 
   const login = async () => {
     try {
       const result = await signInWithEmailAndPassword(auth, fakeEmail, password);
-      const userData = result.user;
-      const ref = doc(db, "users", userData.uid);
-      const snap = await getDoc(ref);
-      if (!snap.exists() || snap.data().approved !== true) {
-        alert("❌ บัญชียังไม่ได้รับการอนุมัติจากผู้ดูแลระบบ");
-        await signOut(auth);
-        return;
-      }
-      setUser(userData);
-      setUserData(snap.data());
+      setUser(result.user);
     } catch (err) {
-      alert("เข้าสู่ระบบไม่สำเร็จ: " + err.message);
+      alert("เข้าสู่ระบบไม่ได้: " + err.message);
     }
   };
 
   const register = async () => {
     try {
       const result = await createUserWithEmailAndPassword(auth, fakeEmail, password);
-      const userData = result.user;
-      await setDoc(doc(db, "users", userData.uid), {
-        username,
-        email: userData.email,
-        approved: false,
-        role: "staff",
-        permissions: {},
-      });
-      alert("✅ สมัครสำเร็จ! กรุณารอแอดมินอนุมัติ");
       await signOut(auth);
+      alert("✅ สมัครสำเร็จแล้ว กรุณาเข้าสู่ระบบ");
       setUsername("");
       setPassword("");
     } catch (err) {
@@ -94,93 +62,123 @@ export default function Home() {
     }
   };
 
-  const togglePermission = async (uid, key) => {
-    const updated = allUsers.map((u) => {
-      if (u.id === uid) {
-        const updatedPermissions = {
-          ...u.permissions,
-          [key]: !u.permissions?.[key],
-        };
-        updateDoc(doc(db, "users", uid), { permissions: updatedPermissions });
-        return { ...u, permissions: updatedPermissions };
-      }
-      return u;
-    });
-    setAllUsers(updated);
+  const loadMenus = async () => {
+    const snapshot = await getDocs(collection(db, "menus"));
+    if (snapshot.empty) {
+      // ไม่มีเมนู สร้างตัวอย่าง
+      await setDoc(doc(db, "menus", "menu_1"), {
+        id: "menu_1",
+        defaultName: "หน้าหลัก",
+        customName: "หน้าหลัก",
+        icon: "🏠",
+        path: "/dashboard",
+        enabledFor: ["kenta"]
+      });
+      return loadMenus();
+    }
+    const all = [];
+    snapshot.forEach((doc) => all.push(doc.data()));
+    setMenus(all);
+  };
+
+  useEffect(() => {
+    if (user) {
+      loadMenus();
+    }
+  }, [user]);
+
+  const saveCustomName = async (id) => {
+    const menuRef = doc(db, "menus", id);
+    await updateDoc(menuRef, { customName: editingMenuName });
+    setEditingMenuId(null);
+    loadMenus();
   };
 
   return (
-    <div style={{ fontFamily: "sans-serif", padding: "2rem" }}>
-      {!user ? (
-        <div style={{ maxWidth: 400, margin: "0 auto" }}>
-          <h1>{mode === "login" ? "🔐 เข้าสู่ระบบ" : "📝 สมัครสมาชิก"}</h1>
-          <input
-            placeholder="ชื่อผู้ใช้"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            style={{ display: "block", width: "100%", padding: 8, marginBottom: 10 }}
-          />
-          <input
-            type="password"
-            placeholder="รหัสผ่าน"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{ display: "block", width: "100%", padding: 8, marginBottom: 10 }}
-          />
-          <button
-            style={{
-              width: "100%",
-              padding: 10,
-              background: "linear-gradient(to bottom, #4CAF50, #2E7D32)",
-              color: "white",
-              borderRadius: 8,
-              border: "none",
-              fontWeight: "bold",
-              boxShadow: "0 4px #1B5E20",
-              cursor: "pointer",
-            }}
-            onClick={mode === "login" ? login : register}
-          >
-            {mode === "login" ? "เข้าสู่ระบบ" : "สมัครสมาชิก"}
-          </button>
-          <p style={{ textAlign: "center", marginTop: 10 }}>
-            {mode === "login" ? (
-              <>
-                ยังไม่มีบัญชี? <a href="#" onClick={() => setMode("register")}>สมัครสมาชิก</a>
-              </>
-            ) : (
-              <>
-                มีบัญชีแล้ว? <a href="#" onClick={() => setMode("login")}>เข้าสู่ระบบ</a>
-              </>
-            )}
-          </p>
-        </div>
-      ) : (
-        <div>
-          <h2>👋 สวัสดี {userData?.username}</h2>
-          {userData?.role === "admin" && (
-            <div>
-              <h3>สิทธิ์ผู้ใช้งาน</h3>
-              {allUsers.map((u) => (
-                <div key={u.id} style={{ borderBottom: "1px solid #ccc", padding: "0.5rem 0" }}>
-                  <strong>{u.username}</strong>
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    {Object.keys({ a: true, b: true, c: true }).map((key) => (
-                      <label key={key}>
-                        <input
-                          type="checkbox"
-                          checked={u.permissions?.[key] || false}
-                          onChange={() => togglePermission(u.id, key)}
-                        /> {key}
-                      </label>
-                    ))}
-                  </div>
-                </div>
+    <div style={{ display: "flex", fontFamily: "sans-serif" }}>
+      {/* เมนูด้านซ้าย */}
+      {user && (
+        <div style={{ width: "240px", background: "#eee", padding: "1rem" }}>
+          <h3>เมนู</h3>
+          <ul style={{ listStyle: "none", padding: 0 }}>
+            {menus
+              .filter((m) => m.enabledFor.includes(user.email.split("@")[0]))
+              .map((m) => (
+                <li key={m.id} style={{ marginBottom: "1rem" }}>
+                  <span style={{ fontSize: "1.2rem" }}>{m.icon}</span>{" "}
+                  {editingMenuId === m.id ? (
+                    <>
+                      <input
+                        value={editingMenuName}
+                        onChange={(e) => setEditingMenuName(e.target.value)}
+                      />
+                      <button onClick={() => saveCustomName(m.id)}>💾</button>
+                    </>
+                  ) : (
+                    <>
+                      <strong>{m.customName}</strong>
+                      {user.email.startsWith("kenta@") && (
+                        <button
+                          onClick={() => {
+                            setEditingMenuId(m.id);
+                            setEditingMenuName(m.customName);
+                          }}
+                          style={{ marginLeft: "0.5rem" }}
+                        >
+                          ✏️
+                        </button>
+                      )}
+                    </>
+                  )}
+                </li>
               ))}
-            </div>
-          )}
+          </ul>
         </div>
       )}
+
+      {/* กลางจอ */}
+      <div style={{ flex: 1, padding: "2rem" }}>
+        {!user ? (
+          <>
+            <h2>{mode === "login" ? "🔐 เข้าสู่ระบบ" : "📝 สมัครสมาชิก"}</h2>
+            <input
+              placeholder="ชื่อผู้ใช้"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              style={{ display: "block", marginBottom: "1rem", padding: "0.5rem" }}
+            />
+            <input
+              type="password"
+              placeholder="รหัสผ่าน"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={{ display: "block", marginBottom: "1rem", padding: "0.5rem" }}
+            />
+            <button onClick={mode === "login" ? login : register}>
+              {mode === "login" ? "เข้าสู่ระบบ" : "สมัครสมาชิก"}
+            </button>
+            <p style={{ marginTop: "1rem" }}>
+              {mode === "login" ? (
+                <>
+                  ยังไม่มีบัญชี? <a onClick={() => setMode("register")}>สมัครสมาชิก</a>
+                </>
+              ) : (
+                <>
+                  มีบัญชีแล้ว? <a onClick={() => setMode("login")}>เข้าสู่ระบบ</a>
+                </>
+              )}
+            </p>
+          </>
+        ) : (
+          <>
+            <h2>👋 สวัสดี {user.email.split("@")[0]}</h2>
+            <p>ระบบเมนูพร้อมกำหนดสิทธิ์แล้ว</p>
+            <button onClick={() => signOut(auth).then(() => setUser(null))}>
+              ออกจากระบบ
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
