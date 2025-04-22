@@ -1,24 +1,10 @@
-// ✅ pages/[site]/[section].js
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { initializeApp } from "firebase/app";
+import { auth, db } from "../../firebaseClient"; // ✅ ใช้ firebaseClient ที่มีการตรวจ duplicate แล้ว
 import ContentBox from "../../components/ContentBox";
 import MenuDropdown from "../../components/MenuDropdown";
-
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
+import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function SectionPage() {
   const router = useRouter();
@@ -54,7 +40,7 @@ export default function SectionPage() {
   }, [site, section]);
 
   const updateFirestore = async (newItems) => {
-    await updateDoc(doc(db, "contents", `${site}_${section}`), {
+    await setDoc(doc(db, "contents", `${site}_${section}`), {
       items: newItems,
     });
     setItems(newItems);
@@ -63,7 +49,7 @@ export default function SectionPage() {
   const logAction = async (action) => {
     if (!user) return;
     const logRef = doc(db, "logs", `${Date.now()}_${user.username}`);
-    await updateDoc(logRef, {
+    await setDoc(logRef, {
       site,
       section,
       user: user.username,
