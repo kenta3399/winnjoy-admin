@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
-import { db, auth } from "../firebaseClient";
+import { auth, db } from "../firebaseClient"; // ✅ ใช้ตัว C ใหญ่
 
 export default function MenuManager() {
   const [menus, setMenus] = useState([]);
