@@ -1,4 +1,4 @@
-// ✅ Full admin panel with fixed menu for all users, except user 'kenta' who has permissions to manage others.
+// 📁 pages/index.js
 
 import { useEffect, useState } from "react";
 import { initializeApp } from "firebase/app";
@@ -52,28 +52,34 @@ export default function Home() {
           signOut(auth);
           return;
         }
-        setUser({ ...u, ...snap.data() });
-        loadMenus();
-        if (snap.data().username === "kenta") {
-          loadUsers();
-        }
+        const userData = { ...u, ...snap.data() };
+        setUser(userData);
+        loadMenus(userData);
+        if (userData.username === "kenta") loadUsers();
       }
     });
     return () => unsub();
   }, []);
 
-  const loadMenus = async () => {
+  const loadMenus = async (currentUser) => {
     const menuSnap = await getDocs(collection(db, "menus"));
     const data = [];
-    menuSnap.forEach(doc => data.push({ id: doc.id, ...doc.data() }));
+    menuSnap.forEach((doc) => {
+      const d = doc.data();
+      const enabledForAll = !d.enabledFor || d.enabledFor.length === 0;
+      const isUserAllowed = d.enabledFor?.includes(currentUser.username);
+      if (d.enabled && (enabledForAll || isUserAllowed || currentUser.username === "kenta")) {
+        data.push({ id: doc.id, ...d });
+      }
+    });
     setMenus(data);
   };
 
   const loadUsers = async () => {
-    const userSnap = await getDocs(collection(db, "users"));
-    const data = [];
-    userSnap.forEach(doc => data.push({ id: doc.id, ...doc.data() }));
-    setUsers(data);
+    const snap = await getDocs(collection(db, "users"));
+    const list = [];
+    snap.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+    setUsers(list);
   };
 
   const login = async () => {
@@ -86,7 +92,9 @@ export default function Home() {
         await signOut(auth);
         return;
       }
-      setUser({ ...result.user, ...snap.data() });
+      const userData = { ...result.user, ...snap.data() };
+      setUser(userData);
+      loadMenus(userData);
     } catch (err) {
       alert("เข้าสู่ระบบไม่สำเร็จ: " + err.message);
     }
@@ -100,7 +108,7 @@ export default function Home() {
         username,
         email: userData.email,
         approved: false,
-        isAdmin: false
+        isAdmin: false,
       });
       alert("✅ สมัครสำเร็จ! กรุณารอแอดมินอนุมัติ");
       await signOut(auth);
@@ -123,7 +131,7 @@ export default function Home() {
           <div style={{ width: 250, background: "#eee", padding: 20 }}>
             <h3>เมนู</h3>
             {menus.map((m, i) => (
-              <div key={i}>📌 {m.name}</div>
+              <div key={i}>{m.icon || "📌"} {m.customName || m.defaultName}</div>
             ))}
           </div>
           <div style={{ flex: 1, padding: 20 }}>
