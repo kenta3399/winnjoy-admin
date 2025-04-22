@@ -1,10 +1,10 @@
-// ✅ _app.js: ครอบ layout + sidebar ทุกหน้า
+// ✅ _app.js: ครอบ layout + sidebar ทุกหน้า พร้อม sidebar แบบ collapsible และระบบสิทธิ์
 import "../styles.css";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { auth, db } from "../firebaseClient";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 export default function MyApp({ Component, pageProps }) {
   const [user, setUser] = useState(null);
@@ -19,13 +19,23 @@ export default function MyApp({ Component, pageProps }) {
         signOut(auth);
         return;
       }
-      setUser({ ...u, ...snap.data() });
+      const userData = { ...u, ...snap.data() };
+      setUser(userData);
+      logPageVisit(userData.username, router.asPath);
     });
-  }, []);
+  }, [router.asPath]);
 
   const logout = () => {
     signOut(auth);
     router.push("/");
+  };
+
+  const logPageVisit = async (username, path) => {
+    await addDoc(collection(db, "logs"), {
+      username,
+      path,
+      timestamp: serverTimestamp(),
+    });
   };
 
   return (
@@ -54,9 +64,9 @@ function Sidebar({ user }) {
   const toggle = (key) => setOpen({ ...open, [key]: !open[key] });
 
   return (
-    <div style={{ width: 260, background: "#f2f2f2", padding: 20 }}>
+    <div className="sidebar">
       <h3>เมนู</h3>
-      <div style={{ marginBottom: 10 }}>🏠 หน้าหลัก</div>
+      <div style={{ marginBottom: 10, cursor: "pointer" }} onClick={() => router.push("/dashboard")}>🏠 หน้าหลัก</div>
       <div>
         <div style={{ fontWeight: "bold", cursor: "pointer" }} onClick={() => toggle("all")}>🌐 เว็บทั้งหมด</div>
         {open["all"] && (
