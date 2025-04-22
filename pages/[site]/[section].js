@@ -6,7 +6,6 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { initializeApp } from "firebase/app";
 import ContentBox from "../../components/ContentBox";
 import MenuDropdown from "../../components/MenuDropdown";
-import "../../styles.css";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,

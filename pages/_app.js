@@ -1,5 +1,5 @@
 // ✅ _app.js: ครอบ layout + sidebar ทุกหน้า พร้อม sidebar แบบ collapsible และระบบสิทธิ์
-import "../styles.css";
+import '../styles.css';
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { auth, db } from "../firebaseClient";
