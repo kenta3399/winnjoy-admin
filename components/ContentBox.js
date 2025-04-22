@@ -1,52 +1,83 @@
-// ✅ components/ContentBox.js
+// ✅ ContentBox.js — กล่องข้อมูลแบบลากได้ + รองรับ preview รูปและขยายภาพ
 import { useRef } from "react";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { Rnd } from "react-rnd";
 
-const storage = getStorage();
+const ContentBox = ({ index, item, canEdit, onEdit, onDelete }) => {
+  const inputRef = useRef();
 
-export default function ContentBox({ index, item, canEdit, onEdit, onDelete }) {
-  const fileInputRef = useRef();
-
-  const handleUpload = async (e) => {
+  const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const storageRef = ref(storage, `uploads/${Date.now()}_${file.name}`);
-    await uploadBytes(storageRef, file);
-    const url = await getDownloadURL(storageRef);
-    onEdit(index, "image", url);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      onEdit(index, "image", event.target.result);
+    };
+    reader.readAsDataURL(file);
   };
 
   return (
-    <div className="content-box">
-      <img src={item.image} className="content-image" alt="img" />
-      {canEdit ? (
-        <>
-          <input
-            value={item.text}
-            onChange={(e) => onEdit(index, "text", e.target.value)}
-            placeholder="ข้อความ..."
-            className="input-text"
+    <Rnd
+      default={{ x: 0, y: 0, width: 300, height: 'auto' }}
+      bounds="parent"
+      enableResizing={false}
+      disableDragging={!canEdit}
+      style={{ marginBottom: 20 }}
+    >
+      <div
+        style={{
+          border: "1px solid #ccc",
+          borderRadius: 12,
+          padding: 16,
+          background: "#fff",
+          boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+          textAlign: "center",
+        }}
+      >
+        {item.image && (
+          <img
+            src={item.image}
+            alt="preview"
+            style={{ maxWidth: "100%", maxHeight: 180, borderRadius: 8, cursor: "zoom-in" }}
+            onClick={() => window.open(item.image, "_blank")}
           />
-          <input
-            type="text"
-            value={item.image}
-            onChange={(e) => onEdit(index, "image", e.target.value)}
-            placeholder="ลิงก์รูปภาพ..."
-            className="input-url"
-          />
+        )}
+
+        {canEdit && (
           <input
             type="file"
             accept="image/*"
-            ref={fileInputRef}
-            onChange={handleUpload}
-            style={{ display: "none" }}
+            ref={inputRef}
+            style={{ display: "block", margin: "10px auto" }}
+            onChange={handleImageChange}
           />
-          <button onClick={() => fileInputRef.current.click()}>📤 อัปโหลดรูป</button>
-          <button onClick={() => onDelete(index)}>🗑️ ลบ</button>
-        </>
-      ) : (
-        <div className="text-preview">{item.text}</div>
-      )}
-    </div>
+        )}
+
+        {canEdit ? (
+          <textarea
+            value={item.text}
+            onChange={(e) => onEdit(index, "text", e.target.value)}
+            placeholder="พิมพ์ข้อความที่นี่..."
+            rows={4}
+            style={{ width: "100%", padding: 8, borderRadius: 8, resize: "vertical" }}
+          />
+        ) : (
+          <div
+            style={{ marginTop: 10, whiteSpace: "pre-wrap", textAlign: "left" }}
+            dangerouslySetInnerHTML={{ __html: item.text }}
+          ></div>
+        )}
+
+        {canEdit && (
+          <button
+            onClick={() => onDelete(index)}
+            style={{ marginTop: 8, background: "#f33", color: "#fff", border: "none", borderRadius: 8, padding: "6px 12px" }}
+          >
+            🗑 ลบ
+          </button>
+        )}
+      </div>
+    </Rnd>
   );
-}
+};
+
+export default ContentBox;

@@ -1,9 +1,16 @@
+// ✅ SectionPage.js — เชื่อมต่อกับ ContentBox แบบ drag & drop และอัปเดต Firestore พร้อม log
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { auth, db } from "../../firebaseClient"; // ✅ ใช้ firebaseClient ที่มีการตรวจ duplicate แล้ว
+import { auth, db } from "../../firebaseClient";
 import ContentBox from "../../components/ContentBox";
 import MenuDropdown from "../../components/MenuDropdown";
-import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  updateDoc,
+  setDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 
 export default function SectionPage() {
@@ -40,8 +47,10 @@ export default function SectionPage() {
   }, [site, section]);
 
   const updateFirestore = async (newItems) => {
-    await setDoc(doc(db, "contents", `${site}_${section}`), {
+    const docRef = doc(db, "contents", `${site}_${section}`);
+    await updateDoc(docRef, {
       items: newItems,
+      updatedAt: serverTimestamp(),
     });
     setItems(newItems);
   };

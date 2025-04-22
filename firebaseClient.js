@@ -1,4 +1,4 @@
-// ✅ firebaseClient.js — แก้บั๊ก duplicate-app
+// firebaseClient.js
 import { initializeApp, getApps } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
@@ -13,7 +13,6 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// ✅ ตรวจสอบก่อนว่าเคย initialize แล้วหรือยัง
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
 const auth = getAuth(app);
