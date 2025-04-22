@@ -15,13 +15,13 @@ import {
 
 // ✅ firebaseConfig ที่ใช้งานจริงของเคนตะ
 const firebaseConfig = {
-  apiKey: "AIzaSyBBYFOEq8BHaZalIxz1x6DVzjBNt1JjFYnM",
+  apiKey: "AIzaSyBBYFOEqBHaZalIxz1x6DvzjBN1IJjFYnM",
   authDomain: "winnjoy-admin.firebaseapp.com",
   projectId: "winnjoy-admin",
-  storageBucket: "winnjoy-admin.appspot.com",
+  storageBucket: "winnjoy-admin.appspot.com", // ← ตรงนี้!!
   messagingSenderId: "999732827140",
   appId: "1:999732827140:web:83693c5f373bb790d2d151",
-  measurementId: "G-1836QJLX1"
+  measurementId: "G-18363QJLX1"
 };
 
 const app = initializeApp(firebaseConfig);
