@@ -1,11 +1,13 @@
-// pages/index.js
-import { useEffect, useState } from "react";
+// ✅ แก้ไขจากโค้ดก่อนหน้า โดยเพิ่มระบบเปิด/ปิดสิทธิ์แต่ละเมนูได้
+
+import { useState, useEffect } from "react";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
+  onAuthStateChanged,
 } from "firebase/auth";
 import {
   getFirestore,
@@ -32,133 +34,123 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 export default function Home() {
+  const [user, setUser] = useState(null);
+  const [menus, setMenus] = useState([]);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [user, setUser] = useState(null);
-  const [mode, setMode] = useState("login");
-  const [menus, setMenus] = useState([]);
-  const [menuEdits, setMenuEdits] = useState({});
+  const [mode, setMode] = useState("login"); // login/register
 
   const fakeEmail = `${username}@local.fake`;
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const ref = doc(db, "users", user.uid);
+        const snap = await getDoc(ref);
+        if (!snap.exists() || snap.data().approved !== true) return;
+        const data = snap.data();
+        const menusSnap = await getDocs(collection(db, "menus"));
+        const menuData = menusSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        setUser({ ...data, uid: user.uid });
+        setMenus(menuData);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const login = async () => {
     try {
       const result = await signInWithEmailAndPassword(auth, fakeEmail, password);
-      const userData = result.user;
-      const ref = doc(db, "users", userData.uid);
+      const ref = doc(db, "users", result.user.uid);
       const snap = await getDoc(ref);
-
       if (!snap.exists() || snap.data().approved !== true) {
-        alert("❌ บัญชียังไม่ได้รับการอนุมัติจากผู้ดูแลระบบ");
+        alert("ยังไม่ได้รับอนุมัติ");
         await signOut(auth);
         return;
       }
-
-      setUser({ ...userData, ...snap.data() });
+      const data = snap.data();
+      const menusSnap = await getDocs(collection(db, "menus"));
+      const menuData = menusSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setUser({ ...data, uid: result.user.uid });
+      setMenus(menuData);
     } catch (err) {
-      alert("เข้าสู่ระบบไม่สำเร็จ: " + err.message);
+      alert("เข้าสู่ระบบล้มเหลว: " + err.message);
     }
   };
 
   const register = async () => {
     try {
       const result = await createUserWithEmailAndPassword(auth, fakeEmail, password);
-      const userData = result.user;
-      await setDoc(doc(db, "users", userData.uid), {
+      await setDoc(doc(db, "users", result.user.uid), {
         username,
-        email: userData.email,
+        email: result.user.email,
         approved: false,
         role: "user",
       });
-      alert("✅ สมัครสำเร็จ! กรุณารอแอดมินอนุมัติ");
+      alert("สมัครแล้ว รออนุมัติ");
       await signOut(auth);
       setUsername("");
       setPassword("");
     } catch (err) {
-      alert("สมัครไม่สำเร็จ: " + err.message);
+      alert("สมัครล้มเหลว: " + err.message);
     }
   };
 
-  const fetchMenus = async () => {
-    const querySnapshot = await getDocs(collection(db, "menus"));
-    const loadedMenus = [];
-    querySnapshot.forEach((doc) => {
-      loadedMenus.push({ id: doc.id, ...doc.data() });
-    });
-    setMenus(loadedMenus);
+  const toggleMenu = async (id, value) => {
+    const ref = doc(db, "menus", id);
+    await updateDoc(ref, { enabled: value });
+    setMenus(menus.map((m) => (m.id === id ? { ...m, enabled: value } : m)));
   };
-
-  const updateMenus = async () => {
-    for (const menuId in menuEdits) {
-      const newLabel = menuEdits[menuId];
-      await updateDoc(doc(db, "menus", menuId), { label: newLabel });
-    }
-    alert("✅ บันทึกเมนูสำเร็จแล้ว");
-    setMenuEdits({});
-    fetchMenus();
-  };
-
-  useEffect(() => {
-    if (user) {
-      fetchMenus();
-    }
-  }, [user]);
-
-  if (!user) {
-    return (
-      <div style={{ padding: 40 }}>
-        <h2>{mode === "login" ? "🔐 เข้าสู่ระบบ" : "📝 สมัครสมาชิก"}</h2>
-        <input
-          placeholder="ชื่อผู้ใช้"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
-        <input
-          placeholder="รหัสผ่าน"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <button onClick={mode === "login" ? login : register}>
-          {mode === "login" ? "เข้าสู่ระบบ" : "สมัครสมาชิก"}
-        </button>
-        <p>
-          {mode === "login" ? (
-            <a href="#" onClick={() => setMode("register")}>สมัครสมาชิก</a>
-          ) : (
-            <a href="#" onClick={() => setMode("login")}>เข้าสู่ระบบ</a>
-          )}
-        </p>
-      </div>
-    );
-  }
 
   return (
-    <div style={{ display: "flex", height: "100vh" }}>
-      <div style={{ width: 300, background: "#eee", padding: 20 }}>
-        <h3>เมนู</h3>
-        {menus.map((menu) => (
-          <div key={menu.id}>
-            <span>🏠 </span>
-            <input
-              value={menuEdits[menu.id] ?? menu.label}
-              onChange={(e) =>
-                setMenuEdits((prev) => ({ ...prev, [menu.id]: e.target.value }))
-              }
-            />
+    <div style={{ display: "flex", padding: 20, gap: 40 }}>
+      {!user ? (
+        <div>
+          <h3>{mode === "login" ? "🔐 เข้าสู่ระบบ" : "📝 สมัครสมาชิก"}</h3>
+          <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="username" />
+          <input value={password} type="password" onChange={(e) => setPassword(e.target.value)} placeholder="password" />
+          <button onClick={mode === "login" ? login : register}>
+            {mode === "login" ? "เข้าสู่ระบบ" : "สมัครสมาชิก"}
+          </button>
+        </div>
+      ) : (
+        <>
+          <div>
+            <h3>เมนู</h3>
+            <ul>
+              {menus.filter((m) => m.enabled).map((m) => (
+                <li key={m.id}>🏠 {m.label}</li>
+              ))}
+            </ul>
           </div>
-        ))}
-        <button onClick={updateMenus}>💾 บันทึกเมนู</button>
-      </div>
-      <div style={{ padding: 40 }}>
-        <h2>
-          👋 สวัสดี <b>{user.username}</b>
-        </h2>
-        <p>ระบบเมนูพร้อมกำหนดสิทธิ์แล้ว</p>
-        <button onClick={() => signOut(auth).then(() => setUser(null))}>
-          ออกจากระบบ
-        </button>
-      </div>
+          <div>
+            <h2>👋 สวัสดี <b>{user.username}</b></h2>
+            <p>ระบบเมนูพร้อมกำหนดสิทธิ์แล้ว</p>
+            {user.username === "kenta" && (
+              <>
+                <h4>กำหนดสิทธิ์เมนู</h4>
+                {menus.map((menu) => (
+                  <div key={menu.id}>
+                    <input
+                      value={menu.label}
+                      onChange={async (e) => {
+                        await updateDoc(doc(db, "menus", menu.id), { label: e.target.value });
+                        setMenus(menus.map((m) => (m.id === menu.id ? { ...m, label: e.target.value } : m)));
+                      }}
+                    />
+                    <input
+                      type="checkbox"
+                      checked={menu.enabled}
+                      onChange={(e) => toggleMenu(menu.id, e.target.checked)}
+                    />
+                  </div>
+                ))}
+              </>
+            )}
+            <button onClick={() => signOut(auth)}>ออกจากระบบ</button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
