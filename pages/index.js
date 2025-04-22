@@ -4,7 +4,7 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/
 
 const firebaseConfig = {
   apiKey: "AIzaSyBBYFOEq8BHaZalIxz1x6DVzjBNt1JjFYnM",
-  authDomain: "winnjoy-admin.vercel.app",
+  authDomain: "winnjoy-admin.firebaseapp.com",
   projectId: "winnjoy-admin",
   storageBucket: "winnjoy-admin.appspot.com",
   messagingSenderId: "999732827140",
