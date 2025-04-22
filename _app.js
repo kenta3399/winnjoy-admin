@@ -1,44 +1,60 @@
 // pages/_app.js
-import '@/styles/globals.css';
-import Link from 'next/link';
 
-const webList = [
-  'JZSPIN', 'PROSPIN999', 'megarich88', 'betman999', 'tem-graph',
-  'siamautobet', 'fiwfun', 'mafinx', 'soza88', 'zocool88',
-  'sanook99', 'oppa55', 'orca55', 'fullhouse88', 'jokerfun88',
-  'loving88', 'luckykid168', 'playboy55', 'maxmo168', 'jadnak'
-];
+import { useEffect, useState } from "react";
+import "@/styles/globals.css";
+import { getFirestore, collection, getDocs } from "firebase/firestore";
+import { initializeApp } from "firebase/app";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+
+const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
 
 export default function App({ Component, pageProps }) {
+  const [menus, setMenus] = useState([]);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      if (u) {
+        const emailPrefix = u.email.split("@")[0];
+        setUser({ email: u.email, username: emailPrefix });
+      }
+    });
+
+    loadMenus();
+
+    return () => unsub();
+  }, []);
+
+  const loadMenus = async () => {
+    const snapshot = await getDocs(collection(db, "menus"));
+    const all = [];
+    snapshot.forEach((doc) => all.push({ id: doc.id, ...doc.data() }));
+    setMenus(all);
+  };
+
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', fontFamily: 'sans-serif' }}>
-      <aside style={{ width: 260, background: '#111', color: '#fff', padding: 20, position: 'fixed', height: '100vh', overflowY: 'auto' }}>
-        <h3 style={{ color: '#fff' }}>📌 เมนูหลัก</h3>
-        <Link href="/" style={{ display: 'block', margin: '10px 0', color: '#ccc', textDecoration: 'none' }}>🏠 หน้าหลัก</Link>
-
-        <details open style={{ marginTop: 20 }}>
-          <summary style={{ cursor: 'pointer', color: '#ccc' }}>🌐 เว็บทั้งหมด</summary>
-          <ul style={{ listStyle: 'none', paddingLeft: 10 }}>
-            {webList.map((web) => (
-              <li key={web} style={{ marginTop: 5 }}>
-                <details>
-                  <summary style={{ color: '#ccc', cursor: 'pointer' }}>{web}</summary>
-                  <ul style={{ listStyle: 'none', paddingLeft: 15 }}>
-                    <li><Link href={`/${web}/promotion`} style={{ color: '#ccc', textDecoration: 'none' }}>• โปรโมชั่น</Link></li>
-                    <li><Link href={`/${web}/pattern`} style={{ color: '#ccc', textDecoration: 'none' }}>• แพทเทิ้ล</Link></li>
-                    <li><Link href={`/${web}/website`} style={{ color: '#ccc', textDecoration: 'none' }}>• หน้าเว็บ</Link></li>
-                    <li><Link href={`/${web}/line`} style={{ color: '#ccc', textDecoration: 'none' }}>• หน้าไลน์</Link></li>
-                  </ul>
-                </details>
-              </li>
-            ))}
-          </ul>
-        </details>
-      </aside>
-
-      <main style={{ marginLeft: 260, padding: 20, flex: 1, background: '#f4f4f4' }}>
-        <Component {...pageProps} />
-      </main>
+    <div style={{ display: "flex" }}>
+      <div style={{ width: 220, background: "#f4f4f4", padding: 20 }}>
+        <h3>เมนู</h3>
+        {menus.map((menu, index) => (
+          <div key={index}>📌 {menu.name}</div>
+        ))}
+      </div>
+      <div style={{ flex: 1 }}>
+        <Component {...pageProps} user={user} menus={menus} />
+      </div>
     </div>
   );
 }
