@@ -1,0 +1,31 @@
+/* styles.css */
+body {
+    margin: 0;
+    font-family: sans-serif;
+  }
+  
+  .sidebar {
+    background: #eee;
+    padding: 20px;
+    height: 100vh;
+  }
+  
+  .sidebar h3 {
+    margin-top: 0;
+  }
+  
+  .sidebar a {
+    display: block;
+    margin: 5px 0;
+    text-decoration: none;
+    color: #333;
+  }
+  
+  .sidebar .sub {
+    margin-left: 20px;
+  }
+  
+  button {
+    margin-top: 10px;
+  }
+  
